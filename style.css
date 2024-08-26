@@ -1,0 +1,51 @@
+:root {
+    --primary-color: 249, 183, 135;
+    --secondary-color: 229, 124, 116;
+    --tertiary-color: 102, 106, 176;
+}
+
+body {
+    background-color: #fefefe;
+    font-family: "Roboto", sans-serif;
+    font-weight: 400;
+    font-style: normal;
+    max-width: 800;
+    margin: 1em auto;
+}
+
+a {
+    color: var(rgb(--tertiary-color));
+    text-decoration: none;
+}
+a:hover {
+    color: var(rgb(--secondary-color));
+    text-decoration: underline;
+}
+
+header {
+    color: black;
+    padding: 0.5em;
+    text-align: center;
+}
+
+h1 {
+    font-size: 80px;
+    font-weight: 300;
+    margin: 0;
+}
+
+footer {
+    border-top: 1px solid #eee;
+    text-align: center;
+}
+
+section {
+    margin: 4em 0;
+}
+
+div.goalbox {
+    background: linear-gradient(to bottom, rgba(var(--primary-color),0.5), rgba(var(--secondary-color),0.5), rgba(var(--tertiary-color),0.5));
+    border-radius: 1em;
+    margin: 2em;
+    padding: 1em;
+}
