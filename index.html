@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en-US">
 <head>
     <meta charset="UTF-8">
@@ -12,17 +13,17 @@
 <body>
 
 <header>
-    <img src="logo_high_res.png" alt="UMUGUC logo" style="width: 500px; height: 270px;">
-    <h1>UMGUC</h1>
+    <img src="img/logo_high_res.png" alt="UMUGUC logo" style="width: 500px; height: 270px;">
+    <h1>UMUGUC</h1>
     <h2>Usability-focused Multi-GPU Compression</h2>
 </header>
 
 <main>
 
 <section>
-    <h3>About</h3>
+    <h3>Background</h3>
     <p>
-        Data compression can both alleviate capacity bottlenecks and even improve performance in GPU compute applications.
+        High-performance data compression can alleviate capacity bottlenecks and even improve performance in GPU compute applications, by reducing memory bandwidth requirements.
         However, integrating compression throughout the entire data processing pipeline is a non-trivial tasks, especially in multi-GPU environments,
         and doing so manually might encode assumption that make it difficult to test other compression methods.
     </p>
@@ -39,8 +40,48 @@
 <section>
     <h3>Overview</h3>
     <p>
-        
+        UMUGUC will offer a simple declarative extension on top of existing buffer abstractions (used in GPU programming models such as SYCL)
+        to allow users to specify that a buffer should be compressed, and to specify either the constraints on compression, or the compression method directly.
+        The former allows the runtime to select the best compression method to achieve the desired quality on the current hardware, while the latter enable
+        users to experiment with different compression methods.
     </p>
+    <p>
+        The API is currently not finalized, but might look somewhat like this:
+<pre><code><span class="keyword">namespace</span> c = <span class="celerity">celerity::compression</span>;
+<span class="keyword">auto</span> range = <span class="celerity">celerity::range</span>&lt;2&gt;(height, width);
+<span class="keyword">using</span> input_comp = <span class="celerity">celerity::compressed</span>&lt;c::lossy&lt;12&gt;&gt;;
+<span class="celerity">celerity::buffer</span><sycl::float3, 2, input_comp> image_input_buf(image_input.data(), range);
+<span class="keyword">using</span> tmp_comp = <span class="celerity">celerity::compressed</span>&lt;c::ndzip&lt;2,16&gt;&gt;;
+<span class="celerity">celerity::buffer</span><sycl::float3, 2, tmp_comp> image_tmp_buf(range);
+</code></pre>
+    </p>
+    <p>
+        The runtime system will then implement the necessary data movement and compression/decompression operations to ensure that the user program
+        can work with the compressed data as if it were uncompressed and of the base type. Depending on the constraints imposed by factors such
+        as the available local and global memory, and the access granularity afforded by the compression method, the runtime system will
+        choose different implementation strategies, as outlined in the figure below for the decompression case:
+    </p>
+
+    <p>
+        <img src="img/comp_options.svg" alt="Schematic illustration of compression implementation options" style="width: 100%;">
+    </p>
+</section>
+
+<section>
+    <h3>Technology</h3>
+    <p>
+        UMUGUC is built on top of the <a href="https://celerity.github.io">Celerity runtime system</a>, which provides a high-level programming model for distributed-memory clusters of GPUs.
+        Celerity is built on top of the Khronos SYCL standard, and provides a data-parallel multi-GPU programming model with a single-source C++ interface.
+        The UMUGUC project will extend Celerity with the necessary abstractions to support end-to-end data compression.
+    </p>
+    <div class="flex-container" style="padding-top:10px;">
+        <a href="https://celerity.github.io">
+            <img src="img/logo_celerity.svg" alt="Celerity Logo" style="height: 120px;">
+        </a>
+        <a href="https://www.khronos.org/sycl">
+            <img src="img/logo_sycl.svg" alt="SYCL Logo" style="height: 120px;">
+        </a>
+    </div>
 </section>
 
 <section>
@@ -52,12 +93,14 @@
     <p>
         The project partners are the University of Innsbruck, and AirborneHydroMapping GmbH. <br>
         UMUGUC is coordinated by <a href="https://dps.uibk.ac.at/~petert">Peter Thoman</a>. <br>
-        <a href="https://www.uibk.ac.at">
-            <img src="logo_uibk.png" alt="University of Innsbruck logo" style="width: 400px; height: 158px;">
-        </a>
-        <a href="https://www.ahm.co.at">
-            <img src="logo_ahm.png" alt="AirborneHydroMapping GmbH logo" style="height: 158px; padding-right: 80px; float: right;">
-        </a>
+        <div class="flex-container">
+            <a href="https://www.uibk.ac.at">
+                <img src="img/logo_uibk.png" alt="University of Innsbruck logo" style="width: 400px; height: 158px;">
+            </a>
+            <a href="https://www.ahm.co.at">
+                <img src="img/logo_ahm.png" alt="AirborneHydroMapping GmbH logo" style="height: 158px;">
+            </a>
+        </div>
     </p>
 </section>
 
@@ -67,7 +110,7 @@
     <p>
         UMUGUC is a research project of the 
         <a href="https://dps.uibk.ac.at">Distributed and Parallel Systems group</a> at the <br>
-        <a href="https://www.uibk.ac.at">University of Innsbruck</a> and 
+        <a href="https://www.uibk.ac.at">University of Innsbruck</a>, and 
         <a href="https://www.ahm.co.at">AirborneHydroMapping GmbH</a>.
     </p>
 </footer>
