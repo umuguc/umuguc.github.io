@@ -76,3 +76,7 @@ span.celerity {
     flex-wrap: wrap;
     justify-content: space-around;
 }
+
+li {
+    margin: 0.5em 0;
+}

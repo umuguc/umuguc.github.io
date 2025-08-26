@@ -46,7 +46,7 @@
         users to experiment with different compression methods.
     </p>
     <p>
-        The API is currently not finalized, but might look somewhat like this:
+        The API is currently not finalized, but will look somewhat like this:
 <pre><code><span class="keyword">namespace</span> c = <span class="celerity">celerity::compression</span>;
 <span class="keyword">auto</span> range = <span class="celerity">celerity::range</span>&lt;2&gt;(height, width);
 <span class="keyword">using</span> input_comp = <span class="celerity">celerity::compressed</span>&lt;c::lossy&lt;12&gt;&gt;;
@@ -72,7 +72,7 @@
     <p>
         UMUGUC is built on top of the <a href="https://celerity.github.io">Celerity runtime system</a>, which provides a high-level programming model for distributed-memory clusters of GPUs.
         Celerity is built on top of the Khronos SYCL standard, and provides a data-parallel multi-GPU programming model with a single-source C++ interface.
-        The UMUGUC project will extend Celerity with the necessary abstractions to support end-to-end data compression.
+        The UMUGUC project extends Celerity with the necessary abstractions to support end-to-end data compression.
     </p>
     <div class="flex-container" style="padding-top:10px;">
         <a href="https://celerity.github.io">
@@ -82,6 +82,37 @@
             <img src="img/logo_sycl.svg" alt="SYCL Logo" style="height: 120px;">
         </a>
     </div>
+</section>
+
+<section>
+    <h3>Publications & Talks</h3>
+    <ul>
+        <li><i>Talk:</i>
+            <br><strong><a href="https://hlpp-conference.github.io/hlpp-2025/program/#technical-session-3">A High-level API for End-to-end Data Compression in Multi-GPU Cluster Applications</a></strong>
+            <br>Gabriel Mitterrutzner, Peter Thoman & Philipp Gschwandtner
+            <br>HLPP'25: 18th International Symposium on High-level Parallel Programming and Applications (2025)
+        </li>
+        <li><i>Conference Paper:</i>
+            <br><strong><a href="https://dl.acm.org/doi/full/10.1145/3731125.3731126">Achieving High-throughput Strided Data Movement Across GPUs</a></strong>
+            <br>Peter Thoman & Philipp Gschwandtner
+            <br>IWOCL '25: Proceedings of the 13th International Workshop on OpenCL and SYCL (2025)
+        </li>
+        <li><i>Talk:</i>
+            <br><strong><a href="https://pasc25.pasc-conference.org/presentation/?id=msa127&sess=sess103">Celerity - SYCL-Based High-Productivity Development at HPC Scale</a></strong>
+            <br>Peter Thoman
+            <br>PASC '25: Platform for Advanced Scientific Computing (2025)
+        </li>
+        <li><i>Journal Paper:</i>
+            <br><strong><a href="https://link.springer.com/article/10.1007/s10766-025-00787-2">Celerity-RSim: Porting Light Propagation Simulation to Accelerator Clusters Using a High-Level API</a></strong>
+            <br>Peter Thoman, Philipp Gschwandtner, Facundo Molina Heredina & Thomas Fahringer
+            <br>International Journal of Parallel Programming (2025)
+        </li>
+        <li><i>Conference Paper:</i>
+            <br><strong><a href="https://dl.acm.org/doi/abs/10.1145/3648115.3648136">SimSYCL: A SYCL Implementation Targeting Development, Debugging, Simulation and Conformance</a></strong>
+            <br>Peter Thoman, Fabian Knorr & Luigi Crisci
+            <br>IWOCL '24: Proceedings of the 12th International Workshop on OpenCL and SYCL (2024)
+        </li>
+    </ul>
 </section>
 
 <section>
