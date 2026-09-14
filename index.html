@@ -16,6 +16,10 @@
     <img src="img/logo_high_res.png" alt="UMUGUC logo" style="width: 500px; height: 270px;">
     <h1>UMUGUC</h1>
     <h2>Usability-focused Multi-GPU Compression</h2>
+    <div class="status-banner">
+        🏁 <strong>Project completed</strong> &mdash; UMUGUC ran from September 2023 to August 2026.
+        This page presents the final results, publications and tooling produced by the project.
+    </div>
 </header>
 
 <main>
@@ -24,55 +28,112 @@
     <h3>Background</h3>
     <p>
         High-performance data compression can alleviate capacity bottlenecks and even improve performance in GPU compute applications, by reducing memory bandwidth requirements.
-        However, integrating compression throughout the entire data processing pipeline is a non-trivial tasks, especially in multi-GPU environments,
-        and doing so manually might encode assumption that make it difficult to test other compression methods.
+        However, integrating compression throughout the entire data processing pipeline is a non-trivial task, especially in multi-GPU environments,
+        and doing so manually tends to bake in assumptions that make it difficult to experiment with different compression methods, particularly
+        <em>domain-specific</em> ones that exploit the structure of a specific kind of data.
     </p>
     <p>
-        UMUGUC is a research project that aims to provide a simple-declarative API which allows a runtime system to transparently map accesses to
-        compressed data representations, without requiring any compression-specific code in user programs.
+        UMUGUC was a research project that set out to make such compression methods easy to use in multi-GPU cluster applications, without requiring
+        application developers to write any compression-specific code, and without requiring compression-algorithm developers to deal with the
+        complexities of distributed execution, data movement, or synchronization.
     </p>
     <div class="goalbox">
-        The basic goal is simple:<br>
-        <strong>Make it easy to work with end-to-end compressed (dense) data in multi-GPU programs.</strong>
+        The basic goal was simple:<br>
+        <strong>Make it easy to work with end-to-end compressed (dense) data in multi-GPU programs &mdash; including custom, domain-specific compression algorithms.</strong>
     </div>
 </section>
 
 <section>
-    <h3>Overview</h3>
+    <h3>How It Works</h3>
     <p>
-        UMUGUC will offer a simple declarative extension on top of existing buffer abstractions (used in GPU programming models such as SYCL)
-        to allow users to specify that a buffer should be compressed, and to specify either the constraints on compression, or the compression method directly.
-        The former allows the runtime to select the best compression method to achieve the desired quality on the current hardware, while the latter enable
-        users to experiment with different compression methods.
+        UMUGUC extends the buffer/accessor programming model of the <a href="https://celerity.github.io">Celerity</a> runtime system with a
+        <code style="display:inline;padding:2px 6px;">compressed&lt;...&gt;</code> buffer type. Compressed data is decompressed transparently
+        whenever a kernel accesses it, using one of four <strong>compression categories</strong>, illustrated below: <em>element-wise</em>
+        compression of individual values, <em>local-memory</em> and <em>global-memory</em> compression of whole tiles/chunks of data, and
+        traditional, application-level <em>kernel</em> compression.
     </p>
     <p>
-        The API is currently not finalized, but will look somewhat like this:
-<pre><code><span class="keyword">namespace</span> c = <span class="celerity">celerity::compression</span>;
-<span class="keyword">auto</span> range = <span class="celerity">celerity::range</span>&lt;2&gt;(height, width);
-<span class="keyword">using</span> input_comp = <span class="celerity">celerity::compressed</span>&lt;c::lossy&lt;12&gt;&gt;;
-<span class="celerity">celerity::buffer</span><sycl::float3, 2, input_comp> image_input_buf(image_input.data(), range);
-<span class="keyword">using</span> tmp_comp = <span class="celerity">celerity::compressed</span>&lt;c::ndzip&lt;2,16&gt;&gt;;
-<span class="celerity">celerity::buffer</span><sycl::float3, 2, tmp_comp> image_tmp_buf(range);
-</code></pre>
+        <img src="img/comp_options.svg" alt="Schematic illustration of the four compression implementation categories: element-wise, local-memory, global-memory and kernel compression" style="width: 100%;">
     </p>
     <p>
-        The runtime system will then implement the necessary data movement and compression/decompression operations to ensure that the user program
-        can work with the compressed data as if it were uncompressed and of the base type. Depending on the constraints imposed by factors such
-        as the available local and global memory, and the access granularity afforded by the compression method, the runtime system will
-        choose different implementation strategies, as outlined in the figure below for the decompression case:
+        The project's main contribution is an extension that lets developers plug in their own <strong>domain-specific</strong> compression
+        algorithms &mdash; including ones that need auxiliary buffers or per-tile metadata &mdash; without touching Celerity's distributed
+        execution model at all. A compression method is expressed as a wrapper bundling (i) the numerical compress/decompress logic and (ii) a
+        <code style="display:inline;padding:2px 6px;">dependency_bundle</code> describing any auxiliary buffers it needs, along with how those
+        buffers should be distributed relative to the compressed data. Given just this wrapper, Celerity automatically reserves the compressed
+        and auxiliary buffers, distributes them across GPUs and nodes, and routes execution to the right compression code &mdash; as
+        summarized below.
     </p>
+    <p>
+        <img src="img/overview_timeline.png" alt="Diagram showing a user-defined compression wrapper (algorithm plus dependency bundle) on the left, application code declaring and accessing a compressed buffer on the top, and the resulting per-node buffer reservations, allocations and inline compression performed by the Celerity runtime on the bottom" style="width: 100%;">
+    </p>
+    <p class="caption"><em>A user-defined compression bundle (left) is used to declare a compressed buffer (top); the runtime then reserves, distributes and populates the compressed buffer together with its auxiliary dependency buffers across GPUs and nodes (bottom).</em></p>
+</section>
 
+<section>
+    <h3>Example: Z-Curve Point Cloud Compression</h3>
     <p>
-        <img src="img/comp_options.svg" alt="Schematic illustration of compression implementation options" style="width: 100%;">
+        As a representative domain-specific algorithm, the project implemented <strong>z-curve compression</strong> for 3D point clouds, such as
+        those produced by airborne LIDAR scanning. Points are quantized onto a 2D z-curve (a space-filling curve that preserves locality) within
+        each grid cell, so that the X/Y position collapses into a single Morton-encoded index; the remaining Z-offset is stored separately as a
+        half-precision value in an auxiliary dependency buffer.
+    </p>
+    <p>
+        <img src="img/zcurve.svg" alt="Illustration of z-curve compression: point positions in a 3D grid cell are encoded as a z-curve index on the X-Y plane plus a Z-coordinate offset" style="width: 100%;">
+    </p>
+    <p>
+        Implementing this &mdash; and any other &mdash; domain-specific algorithm with the new API only requires two things: a small wrapper
+        exposing the compression object and its dependencies, and the compress/decompress logic itself. Everything else, including allocation,
+        distribution and synchronization of the auxiliary Z-offset buffer, is handled by the runtime:
+    </p>
+<pre><code><span class="keyword">using</span> compression_t = <span class="celerity">z_curve_compression</span>&lt;Point, uint32_t, category::local_memory&gt;;
+compression_t z_curve{Point{x_min, y_min, 0}, xy_resolution};
+
+// Compressed buffer instead of a regular one - same buffer/accessor API otherwise.
+<span class="celerity">celerity::buffer</span>&lt;Point, 3, compression_t&gt;
+    tile_points({width, height, points_per_tile}, z_curve);
+
+<span class="celerity">queue</span>.submit([&amp;](<span class="celerity">handler</span>&amp; cgh) {
+    <span class="celerity">accessor</span> tile_point_acc{tile_points, cgh, full_third_dim&lt;3&gt;{}, read_only};
+    ... // kernel code accesses tile_point_acc exactly like an uncompressed buffer
+});
+</code></pre>
+</section>
+
+<section>
+    <h3>Results</h3>
+    <p>
+        The final API was evaluated on three benchmarks &mdash; airborne point cloud processing, a Jacobi-style wave simulation, and a
+        room-response simulation (RSim) &mdash; across three GPU platforms (a Leonardo supercomputer partition, a 4x RTX 3090 workstation,
+        and an 8x NVIDIA L40S node), comparing compressed variants against uncompressed baselines.
+    </p>
+    <p>
+        <img src="img/point_cloud_results.png" alt="Point cloud pipeline results on 4x NVIDIA RTX 3090: tiling runtime, shape-factor runtime, combined pipeline runtime, and relative memory usage across compression variants" style="width: 100%;">
+    </p>
+    <p class="caption"><em>Point cloud pipeline results: all compressed variants speed up the memory-bound tiling stage, and the domain-specific z-curve method reduces memory usage by up to 5.2&times; while still yielding a net end-to-end speedup.</em></p>
+    <p>
+        <img src="img/rsim_results.png" alt="RSim results on Leonardo across GPU counts up to 16 GPUs: execution time and accuracy for uncompressed, linear quantization, log quantization, optimized log quantization and lookup-table quantization" style="width: 100%;">
+    </p>
+    <p class="caption"><em>RSim results: optimized logarithmic and lookup-table quantization outperform the uncompressed baseline while keeping accuracy loss within tolerance, and scale near-linearly up to 16 GPUs.</em></p>
+    <p>
+        <img src="img/wave_sim_results.png" alt="Wave Sim results on an 8x NVIDIA L40S node comparing uncompressed, element-wise, local-memory and global-memory compression" style="width: 100%;">
+    </p>
+    <p class="caption"><em>Wave Sim results: element-wise compression gives a stable ~2.5&times; speedup, while global-memory compression is the only category that underperforms due to extra memory traffic.</em></p>
+    <p>
+        Across all three benchmarks, the best-performing compression category depends on the workload's access pattern &mdash; but in every
+        case, the new API made it possible to reach that performance without any compression-specific code outside the algorithm's own wrapper.
+        The design does have limits: compression logic must be expressible on the GPU, it primarily targets fixed-size (rather than
+        e.g. entropy-coded) compression schemes, and writing a dependency's range mapper still requires understanding the algorithm's access
+        pattern in detail.
     </p>
 </section>
 
 <section>
     <h3>Technology</h3>
     <p>
-        UMUGUC is built on top of the <a href="https://celerity.github.io">Celerity runtime system</a>, which provides a high-level programming model for distributed-memory clusters of GPUs.
+        UMUGUC was built on top of the <a href="https://celerity.github.io">Celerity runtime system</a>, which provides a high-level programming model for distributed-memory clusters of GPUs.
         Celerity is built on top of the Khronos SYCL standard, and provides a data-parallel multi-GPU programming model with a single-source C++ interface.
-        The UMUGUC project extends Celerity with the necessary abstractions to support end-to-end data compression.
+        The UMUGUC project extended Celerity with the necessary abstractions to support end-to-end, domain-specific data compression.
     </p>
     <div class="flex-container" style="padding-top:10px;">
         <a href="https://celerity.github.io">
@@ -85,8 +146,33 @@
 </section>
 
 <section>
+    <h3>Tooling</h3>
+    <p>
+        Alongside the API and its evaluation, the project produced a small set of supporting command-line and GUI tools, released separately in the
+        <a href="https://github.com/umuguc/tooling">umuguc/tooling</a> repository:
+    </p>
+    <ul>
+        <li><strong>Data Converter</strong> &mdash; converts AirborneHydroMapping's HDF5-based airborne LIDAR point clouds into the plain, uncompressed binary point format used by UMUGUC's point cloud benchmark.</li>
+        <li><strong>Visualizer</strong> &mdash; an Open3D-based viewer for interactively inspecting point clouds and the pipeline's intermediate results, including height maps, spatial tile grids, and per-tile shape factors.</li>
+    </ul>
+    <p>
+        Both tools are self-contained CMake projects; see the repository's <a href="https://github.com/umuguc/tooling">README</a> for build instructions and usage details.
+    </p>
+</section>
+
+<section>
     <h3>Publications & Talks</h3>
     <ul>
+        <li><i>Talk:</i>
+            <br><strong><a href="https://sites.google.com/view/hlpp-2026/hlpp-2026/program">High-level Domain-specific End-to-end Compression in GPU Cluster Runtime Systems</a></strong>
+            <br>Gabriel Mitterrutzner & Peter Thoman
+            <br>HLPP'26: 19th International Symposium on High-level Parallel Programming and Applications (2026)
+        </li>
+        <li><i>Journal Paper:</i>
+            <br><strong><a href="https://doi.org/10.1007/s10766-026-00818-6">A High-level API for End-to-end Data Compression in Multi-GPU Cluster Applications</a></strong>
+            <br>Gabriel Mitterrutzner, Peter Thoman & Philipp Gschwandtner
+            <br>International Journal of Parallel Programming, 54(3) (2026)
+        </li>
         <li><i>Talk:</i>
             <br><strong><a href="https://hlpp-conference.github.io/hlpp-2025/program/#technical-session-3">A High-level API for End-to-end Data Compression in Multi-GPU Cluster Applications</a></strong>
             <br>Gabriel Mitterrutzner, Peter Thoman & Philipp Gschwandtner
@@ -118,12 +204,12 @@
 <section>
     <h3>Partners & Funding</h3>
     <p>
-        UMGUC is <a href="https://projekte.ffg.at/projekt/4814683">funded by the Austrian Research Promotion Agency (FFG)</a> 
-        under the <a href="https://www.ffg.at/en/programme/bridge">BRIDGE</a> programme.
+        UMUGUC was <a href="https://projekte.ffg.at/projekt/4814683">funded by the Austrian Research Promotion Agency (FFG)</a>
+        under the <a href="https://www.ffg.at/en/programme/bridge">BRIDGE</a> programme, running from September 2023 to August 2026.
     </p>
     <p>
-        The project partners are the University of Innsbruck, and AirborneHydroMapping GmbH. <br>
-        UMUGUC is coordinated by <a href="https://dps.uibk.ac.at/~petert">Peter Thoman</a>. <br>
+        The project partners were the University of Innsbruck, and AirborneHydroMapping GmbH. <br>
+        UMUGUC was coordinated by <a href="https://dps.uibk.ac.at/~petert">Peter Thoman</a>. <br>
         <div class="flex-container">
             <a href="https://www.uibk.ac.at">
                 <img src="img/logo_uibk.png" alt="University of Innsbruck logo" style="width: 400px; height: 158px;">
@@ -139,9 +225,9 @@
 
 <footer>
     <p>
-        UMUGUC is a research project of the 
+        UMUGUC was a research project of the
         <a href="https://dps.uibk.ac.at">Distributed and Parallel Systems group</a> at the <br>
-        <a href="https://www.uibk.ac.at">University of Innsbruck</a>, and 
+        <a href="https://www.uibk.ac.at">University of Innsbruck</a>, and
         <a href="https://www.ahm.co.at">AirborneHydroMapping GmbH</a>.
     </p>
 </footer>

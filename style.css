@@ -51,6 +51,27 @@ div.goalbox {
     padding: 1em;
 }
 
+div.status-banner {
+    background: rgba(var(--tertiary-color), 0.1);
+    border: 1px solid rgba(var(--tertiary-color), 0.4);
+    border-radius: 0.6em;
+    max-width: 640px;
+    margin: 1.5em auto 0;
+    padding: 0.7em 1.2em;
+    text-align: center;
+    font-size: 0.95em;
+}
+div.status-banner strong {
+    color: rgb(var(--tertiary-color));
+}
+
+p.caption {
+    text-align: center;
+    font-size: 0.85em;
+    color: #777;
+    margin-top: 0.3em;
+}
+
 code {
     font-family: 'Consolas', 'Courier New', monospace;
     background-color: #1a1a1a;
