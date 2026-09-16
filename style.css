@@ -72,6 +72,29 @@ p.caption {
     margin-top: 0.3em;
 }
 
+div.pill-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6em;
+    margin-top: 0.9em;
+}
+a.pill {
+    display: inline-block;
+    background: rgba(var(--tertiary-color), 0.1);
+    border: 1px solid rgba(var(--tertiary-color), 0.4);
+    border-radius: 999px;
+    padding: 0.35em 1.1em;
+    font-size: 0.85em;
+    font-weight: 500;
+    color: rgb(var(--tertiary-color));
+}
+a.pill:hover {
+    background: rgba(var(--tertiary-color), 0.2);
+    text-decoration: none;
+}
+
 code {
     font-family: 'Consolas', 'Courier New', monospace;
     background-color: #1a1a1a;
