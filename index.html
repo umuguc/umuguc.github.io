@@ -50,23 +50,30 @@
 <section>
     <h3>How It Works</h3>
     <p>
-        UMUGUC extends the buffer/accessor programming model of the <a href="https://celerity.github.io">Celerity</a> runtime system with a
-        <code style="display:inline;padding:2px 6px;">compressed&lt;...&gt;</code> buffer type. Compressed data is decompressed transparently
-        whenever a kernel accesses it, using one of four <strong>compression categories</strong>, illustrated below: <em>element-wise</em>
-        compression of individual values, <em>local-memory</em> and <em>global-memory</em> compression of whole tiles/chunks of data, and
-        traditional, application-level <em>kernel</em> compression.
+        UMUGUC's main contribution is a user-facing API, built on top of Celerity's existing buffer/accessor programming model, with two
+        sides. On the <strong>application side</strong>, a program simply declares a buffer as <code class="inline">compressed&lt;...&gt;</code>
+        and then accesses it exactly like an uncompressed one &mdash; no compression-specific code required. On the
+        <strong>compression-developer side</strong>, a small, typed interface lets someone implement a new compression algorithm, including
+        domain-specific ones, without having to deal with Celerity's distributed execution, data movement, or synchronization at all.
     </p>
     <p>
-        <img src="img/comp_options.svg" alt="Schematic illustration of the four compression implementation categories: element-wise, local-memory, global-memory and kernel compression" style="width: 100%;">
+        As part of this work, we introduced a classification of compression methods into four <strong>compression categories</strong>, based
+        on where in the GPU memory hierarchy (de)compression happens; this categorization is an integral part of the API design and is
+        illustrated below: <em>element-wise</em> compression of individual values, <em>local-memory</em> and <em>global-memory</em>
+        compression of whole tiles/chunks of data, and traditional, application-level <em>kernel</em> compression using a dedicated
+        compression pass. UMUGUC implements runtime support for the first three of these categories; kernel compression is simply the
+        conventional way of doing things without any special runtime support, and is shown below only for context.
     </p>
     <p>
-        The project's main contribution is an extension that lets developers plug in their own <strong>domain-specific</strong> compression
-        algorithms &mdash; including ones that need auxiliary buffers or per-tile metadata &mdash; without touching Celerity's distributed
-        execution model at all. A compression method is expressed as a wrapper bundling (i) the numerical compress/decompress logic and (ii) a
-        <code style="display:inline;padding:2px 6px;">dependency_bundle</code> describing any auxiliary buffers it needs, along with how those
-        buffers should be distributed relative to the compressed data. Given just this wrapper, Celerity automatically reserves the compressed
-        and auxiliary buffers, distributes them across GPUs and nodes, and routes execution to the right compression code &mdash; as
-        summarized below.
+        <img src="img/comp_options.svg" alt="Schematic illustration of the four compression categories devised by the project: element-wise, local-memory and global-memory compression, all implemented by the Celerity runtime extension, alongside traditional kernel compression which is shown for context but not implemented as part of the runtime" style="width: 100%;">
+    </p>
+    <p>
+        On the compression-developer side, algorithms can also declare <strong>auxiliary buffers</strong> or per-tile metadata they need
+        &mdash; which is often the case for domain-specific methods. A compression method is expressed as a wrapper bundling (i) the
+        numerical compress/decompress logic and (ii) a <code class="inline">dependency_bundle</code> describing any auxiliary buffers it
+        needs, along with how those buffers should be distributed relative to the compressed data. Given just this wrapper, Celerity
+        automatically reserves the compressed and auxiliary buffers, distributes them across GPUs and nodes, and routes execution to the
+        right compression code, as seen below.
     </p>
     <p>
         <img src="img/overview_timeline.png" alt="Diagram showing a user-defined compression wrapper (algorithm plus dependency bundle) on the left, application code declaring and accessing a compressed buffer on the top, and the resulting per-node buffer reservations, allocations and inline compression performed by the Celerity runtime on the bottom" style="width: 100%;">
@@ -105,29 +112,17 @@ compression_t z_curve{Point{x_min, y_min, 0}, xy_resolution};
 </section>
 
 <section>
-    <h3>Results</h3>
+    <h3>Evaluation & Scope</h3>
     <p>
-        The final API was evaluated on three benchmarks &mdash; airborne point cloud processing, a Jacobi-style wave simulation, and a
-        room-response simulation (RSim) &mdash; across three GPU platforms (a Leonardo supercomputer partition, a 4x RTX 3090 workstation,
-        and an 8x NVIDIA L40S node), comparing compressed variants against uncompressed baselines.
+        The API was evaluated by implementing several element-wise, local-memory and global-memory compression methods &mdash; including
+        the z-curve algorithm above and other domain-specific and quantization-based techniques &mdash; on three GPU-cluster benchmarks
+        (airborne point cloud processing, a wave simulation, and a room-response simulation) across three different hardware platforms.
+        The detailed results, including memory reduction and per-category performance trade-offs for each benchmark, are presented in the
+        accompanying paper (see Publications & Talks below).
     </p>
     <p>
-        <img src="img/point_cloud_results.png" alt="Point cloud pipeline results on 4x NVIDIA RTX 3090: tiling runtime, shape-factor runtime, combined pipeline runtime, and relative memory usage across compression variants" style="width: 100%;">
-    </p>
-    <p class="caption"><em>Point cloud pipeline results: all compressed variants speed up the memory-bound tiling stage, and the domain-specific z-curve method reduces memory usage by up to 5.2&times; while still yielding a net end-to-end speedup.</em></p>
-    <p>
-        <img src="img/rsim_results.png" alt="RSim results on Leonardo across GPU counts up to 16 GPUs: execution time and accuracy for uncompressed, linear quantization, log quantization, optimized log quantization and lookup-table quantization" style="width: 100%;">
-    </p>
-    <p class="caption"><em>RSim results: optimized logarithmic and lookup-table quantization outperform the uncompressed baseline while keeping accuracy loss within tolerance, and scale near-linearly up to 16 GPUs.</em></p>
-    <p>
-        <img src="img/wave_sim_results.png" alt="Wave Sim results on an 8x NVIDIA L40S node comparing uncompressed, element-wise, local-memory and global-memory compression" style="width: 100%;">
-    </p>
-    <p class="caption"><em>Wave Sim results: element-wise compression gives a stable ~2.5&times; speedup, while global-memory compression is the only category that underperforms due to extra memory traffic.</em></p>
-    <p>
-        Across all three benchmarks, the best-performing compression category depends on the workload's access pattern &mdash; but in every
-        case, the new API made it possible to reach that performance without any compression-specific code outside the algorithm's own wrapper.
-        The design does have limits: compression logic must be expressible on the GPU, it primarily targets fixed-size (rather than
-        e.g. entropy-coded) compression schemes, and writing a dependency's range mapper still requires understanding the algorithm's access
+        The design does have limits: compression logic must be expressible on the GPU, it primarily targets fixed-size (rather than e.g.
+        entropy-coded) compression schemes, and writing a dependency's range mapper still requires understanding the algorithm's access
         pattern in detail.
     </p>
 </section>
